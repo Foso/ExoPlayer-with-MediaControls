@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html>
 <head>
 </head>
@@ -7,6 +6,7 @@
 
 This is a small project i created to learn how to use the Exoplayer from Google.
 It plays an video from an URL and you can control the playback.
+It can now play HLS and mp4 streams
 
 <img src="https://github.com/Foso/foso.github.io/blob/master/img/exoplayer.png" />Exoplayer with MediaControls</img>
 </body>
