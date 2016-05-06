@@ -13,16 +13,27 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
+import com.google.android.exoplayer.DefaultLoadControl;
 import com.google.android.exoplayer.ExoPlayer;
+import com.google.android.exoplayer.LoadControl;
 import com.google.android.exoplayer.MediaCodecAudioTrackRenderer;
 import com.google.android.exoplayer.MediaCodecSelector;
 import com.google.android.exoplayer.MediaCodecVideoTrackRenderer;
 import com.google.android.exoplayer.extractor.ExtractorSampleSource;
+import com.google.android.exoplayer.hls.DefaultHlsTrackSelector;
+import com.google.android.exoplayer.hls.HlsChunkSource;
+import com.google.android.exoplayer.hls.HlsPlaylist;
+import com.google.android.exoplayer.hls.HlsPlaylistParser;
+import com.google.android.exoplayer.hls.HlsSampleSource;
+import com.google.android.exoplayer.hls.PtsTimestampAdjusterProvider;
 import com.google.android.exoplayer.upstream.Allocator;
 import com.google.android.exoplayer.upstream.DataSource;
 import com.google.android.exoplayer.upstream.DefaultAllocator;
+import com.google.android.exoplayer.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer.upstream.DefaultUriDataSource;
+import com.google.android.exoplayer.util.ManifestFetcher;
 
+import java.io.IOException;
 import java.util.Formatter;
 import java.util.Locale;
 
@@ -33,11 +44,11 @@ import java.util.Locale;
 *
 * */
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity  {
 
     private SurfaceView surfaceView;
     private ExoPlayer exoPlayer;
-    private boolean bAutoplay=false;
+    private boolean bAutoplay=true;
     private boolean bIsPlaying=false;
     private boolean bControlsActive=true;
     private ImageButton btnPlay;
@@ -45,7 +56,7 @@ public class MainActivity extends Activity {
     private ImageButton btnPrev;
     private ImageButton btnRew;
     private ImageButton btnNext;
-    private int RENDERER_COUNT = 300000;// Je Hochauflösender desto mehr
+    private int RENDERER_COUNT = 300000;
     private int minBufferMs =    250000;
 
     private final int BUFFER_SEGMENT_SIZE = 64 * 1024;
@@ -57,6 +68,9 @@ public class MainActivity extends Activity {
     private TextView txtEndTime;
     private StringBuilder mFormatBuilder;
     private Formatter mFormatter;
+    private String HLSurl = "http://walterebert.com/playground/video/hls/sintel-trailer.m3u8";
+    private String mp4URL = "http://www.sample-videos.com/video/mp4/480/big_buck_bunny_480p_5mb.mp4";
+    private String userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:40.0) Gecko/20100101 Firefox/40.0";
 
 
     @Override
@@ -67,13 +81,17 @@ public class MainActivity extends Activity {
         mediaController = (LinearLayout) findViewById(R.id.lin_media_controller);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        initPlayer(0);
-        initMediaControls();
+       // initPlayer(0);
+         initHLSPlayer(0);
+
 
         if(bAutoplay){
-            exoPlayer.setPlayWhenReady(true);
-            bIsPlaying=true;
-            setProgress();
+            if(exoPlayer!=null){
+                exoPlayer.setPlayWhenReady(true);
+                bIsPlaying=true;
+                setProgress();
+            }
+
         }
 
     }
@@ -226,8 +244,8 @@ public class MainActivity extends Activity {
             }
         });
 
-            seekPlayerProgress.setMax(0);
-            seekPlayerProgress.setMax((int) exoPlayer.getDuration()/1000);
+        seekPlayerProgress.setMax(0);
+        seekPlayerProgress.setMax((int) exoPlayer.getDuration()/1000);
 
     }
 
@@ -261,27 +279,25 @@ public class MainActivity extends Activity {
         btnPlay.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                    if(bIsPlaying){
-                        exoPlayer.setPlayWhenReady(false);
-                        bIsPlaying=false;
-                    }else{
-                        exoPlayer.setPlayWhenReady(true);
-                        bIsPlaying=true;
-                        setProgress();
-                    }
+                if(bIsPlaying){
+                    exoPlayer.setPlayWhenReady(false);
+                    bIsPlaying=false;
+                }else{
+                    exoPlayer.setPlayWhenReady(true);
+                    bIsPlaying=true;
+                    setProgress();
+                }
             }
         });
     }
 
     private void initPlayer(int position) {
-        String userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:40.0) Gecko/20100101 Firefox/40.0";
 
-        String url = "http://www.sample-videos.com/video/mp4/480/big_buck_bunny_480p_5mb.mp4";
+
         Allocator allocator = new DefaultAllocator(minBufferMs);
         DataSource dataSource = new DefaultUriDataSource(this, null, userAgent);
 
-
-        ExtractorSampleSource sampleSource = new ExtractorSampleSource( Uri.parse(url), dataSource, allocator,
+        ExtractorSampleSource sampleSource = new ExtractorSampleSource( Uri.parse(mp4URL), dataSource, allocator,
                 BUFFER_SEGMENT_COUNT * BUFFER_SEGMENT_SIZE);
 
         MediaCodecVideoTrackRenderer videoRenderer = new
@@ -296,9 +312,54 @@ public class MainActivity extends Activity {
                 MediaCodecVideoTrackRenderer.MSG_SET_SURFACE,
                 surfaceView.getHolder().getSurface());
         exoPlayer.seekTo(position);
-
+        initMediaControls();
 
     }
 
+    private void initHLSPlayer(int position) {
+        Handler mHandler= new Handler();
+        final ManifestFetcher<HlsPlaylist> playlistFetcher;
+        HlsPlaylistParser parser = new HlsPlaylistParser();
+        playlistFetcher = new ManifestFetcher<>(HLSurl,
+                new DefaultUriDataSource(this, userAgent), parser);
 
+
+        playlistFetcher.singleLoad(mHandler.getLooper(), new ManifestFetcher.ManifestCallback<HlsPlaylist>() {
+
+
+            @Override
+            public void onSingleManifest(HlsPlaylist manifest) {
+
+                LoadControl loadControl = new DefaultLoadControl(new DefaultAllocator(BUFFER_SEGMENT_SIZE));
+                DefaultBandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+                PtsTimestampAdjusterProvider timestampAdjusterProvider = new PtsTimestampAdjusterProvider();
+                DataSource dataSource = new DefaultUriDataSource(MainActivity.this, bandwidthMeter, userAgent);
+                HlsChunkSource chunkSource = new HlsChunkSource(true , dataSource, HLSurl, playlistFetcher.getManifest(),
+                        DefaultHlsTrackSelector.newDefaultInstance(MainActivity.this), bandwidthMeter, timestampAdjusterProvider,
+                        HlsChunkSource.ADAPTIVE_MODE_SPLICE);
+                HlsSampleSource sampleSource = new HlsSampleSource(chunkSource, loadControl,
+                        BUFFER_SEGMENT_COUNT * BUFFER_SEGMENT_SIZE);
+                MediaCodecVideoTrackRenderer videoRenderer = new MediaCodecVideoTrackRenderer(MainActivity.this, sampleSource,
+                        MediaCodecSelector.DEFAULT, MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT);
+                MediaCodecAudioTrackRenderer audioRenderer = new MediaCodecAudioTrackRenderer(sampleSource,
+                        MediaCodecSelector.DEFAULT);
+
+                exoPlayer = ExoPlayer.Factory.newInstance(RENDERER_COUNT);
+                exoPlayer.prepare(videoRenderer, audioRenderer);
+                exoPlayer.sendMessage(videoRenderer,
+                        MediaCodecVideoTrackRenderer.MSG_SET_SURFACE,
+                        surfaceView.getHolder().getSurface());
+                exoPlayer.seekTo(0);
+
+                initMediaControls();
+
+
+            }
+
+            @Override
+            public void onSingleManifestError(IOException e) {
+
+            }
+        });
+    }
 }
