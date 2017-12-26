@@ -1,15 +1,17 @@
+apply from: 'constants.gradle'
 apply plugin: 'com.android.application'
 
+
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.2"
+    compileSdkVersion compileSdk
+    buildToolsVersion buildTools
 
     defaultConfig {
-        applicationId "jensklingenberg.de.exampleexoplayer"
-        minSdkVersion 16
-        targetSdkVersion 23
-        versionCode 1
-        versionName "1.0"
+        applicationId applicationId
+        minSdkVersion minSdk
+        targetSdkVersion targetSdk
+        versionCode versionCode
+        versionName versionName
     }
     buildTypes {
         release {
@@ -21,7 +23,11 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    testCompile 'junit:junit:4.12'
-    compile 'com.android.support:appcompat-v7:23.3.0'
-    compile 'com.google.android.exoplayer:exoplayer:r1.5.7'
+    testCompile "junit:junit:${junitVersion}"
+    implementation "com.android.support:appcompat-v7:${supportLibVersion}"
+    compile "com.google.android.exoplayer:exoplayer:${exoplayerVersion}"
+    implementation "com.jakewharton:butterknife:${butterknifeVersion}"
+    annotationProcessor "com.jakewharton:butterknife-compiler:${butterknifeVersion}"
+
+
 }
