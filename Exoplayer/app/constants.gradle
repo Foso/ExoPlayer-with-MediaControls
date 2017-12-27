@@ -1,0 +1,15 @@
+project.ext {
+
+  applicationId = "jensklingenberg.de.exampleexoplayer"
+  compileSdk = 27
+  targetSdk = 27
+  minSdk = 21
+  versionCode = 1
+  versionName = "1.0"
+  buildTools = '27.0.1'
+  junitVersion = '4.12'
+  appVersion = '1.0'
+  butterknifeVersion = '8.8.1'
+  supportLibVersion = '27.0.2'
+  exoplayerVersion = '2.6.0'
+}
